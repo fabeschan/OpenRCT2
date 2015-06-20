@@ -1077,15 +1077,20 @@ bool sub_6C683D(int x, int y, int z, int direction, int type, int flags, int col
  * 
  * rct2: 0x006C6096
  */
-rct_map_element *sub_6C6096(int x, int y, int z, int direction)
+rct_map_element *sub_6C6096(int *x, int *y, int *z, int *direction)
 {
 	int eax, ebx, ecx, edx, esi, edi, ebp;
-	eax = x;
-	ecx = y;
-	edx = z;
-	ebx = direction;
+	eax = *x;
+	ecx = *y;
+	edx = *z;
+	ebx = *direction;
 	if (RCT2_CALLFUNC_X(0x006C6096, &eax, &ebx, &ecx, &edx, &esi, &edi, &ebp) & 0x100)
 		return NULL;
+
+	*x = (eax & 0xFFFF);
+	*y = (ecx & 0xFFFF);
+	*z = (edx & 0xFFFF);
+	*direction = (ebx & 0xFF);
 	
 	return (rct_map_element*)esi;
 }
@@ -1106,7 +1111,7 @@ void sub_6C96C0()
 		RCT2_GLOBAL(0x00F440B0, uint8) &= ~4;
 		game_do_command(
 			RCT2_GLOBAL(0x00F440BF, uint16),
-			0,
+			41,
 			RCT2_GLOBAL(0x00F440C1, uint16),
 			RCT2_GLOBAL(0x00F440A7, uint8),
 			GAME_COMMAND_13,
@@ -1136,7 +1141,7 @@ void sub_6C96C0()
 				x -= TileDirectionDelta[direction].x;
 				y -= TileDirectionDelta[direction].y;
 			}
-			trackElement = sub_6C6096(x, y, z, direction);
+			trackElement = sub_6C6096(&x, &y, &z, &direction);
 			if (trackElement != NULL) {
 				game_do_command(
 					x,

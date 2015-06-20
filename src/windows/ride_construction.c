@@ -276,10 +276,13 @@ static void window_ride_construction_select_map_tiles(rct_ride *ride, int trackT
 money32 sub_6CA162(int rideIndex, int trackType, int trackDirection, int edxRS16, int x, int y, int z);
 
 #define _enabledRidePieces							RCT2_GLOBAL(0x00F44048, uint64)
+#define _enabledRidePiecesA							RCT2_GLOBAL(0x00F44048, uint32)
+#define _enabledRidePiecesB							RCT2_GLOBAL(0x00F4404C, uint32)
 
 #define _currentTrackPrice							RCT2_GLOBAL(0x00F44070, money32)
 
-#define _numCurrentPossibleRideConfigurations		RCT2_GLOBAL(0x00F44078, uint8)
+#define _numCurrentPossibleRideConfigurations		RCT2_GLOBAL(0x00F44078, uint16)
+#define _numCurrentPossibleSpecialTrackPieces		RCT2_GLOBAL(0x00F4407A, uint16)
 
 #define _previousTrackPieceSlope					RCT2_GLOBAL(0x00F440A0, uint16)
 
@@ -290,6 +293,10 @@ money32 sub_6CA162(int rideIndex, int trackType, int trackDirection, int edxRS16
 #define _currentTrackPieceZ							RCT2_GLOBAL(0x00F440AC, uint16)
 #define _currentTrackPieceDirection					RCT2_GLOBAL(0x00F440AE, uint8)
 #define _currentTrackPieceType						RCT2_GLOBAL(0x00F440AF, uint8)
+
+#define _previousTrackPieceX						RCT2_GLOBAL(0x00F440B9, uint16)
+#define _previousTrackPieceY						RCT2_GLOBAL(0x00F440BB, uint16)
+#define _previousTrackPieceZ						RCT2_GLOBAL(0x00F440BD, uint16)
 
 #define _rideConstructionArrowPulseTime				RCT2_GLOBAL(0x00F440B1, sint8)
 
@@ -536,11 +543,19 @@ static void window_ride_construction_update(rct_window *w)
 	}
 
 	if (_rideConstructionState == RIDE_CONSTRUCTION_STATE_PLACE) {
+		if (!widget_is_active_tool(w, WIDX_CONSTRUCT)) {
+			window_close(w);
+			return;
+		}
+	}
+
+	if (_rideConstructionState == RIDE_CONSTRUCTION_STATE_ENTRANCE_EXIT) {
 		if (!widget_is_active_tool(w, WIDX_ENTRANCE) && !widget_is_active_tool(w, WIDX_EXIT)) {
 			_rideConstructionState = RCT2_GLOBAL(0x00F440CC, uint8);
 			sub_6C84CE();
 		}
 	}
+
 	switch (_rideConstructionState) {
 	case RIDE_CONSTRUCTION_STATE_FRONT:
 	case RIDE_CONSTRUCTION_STATE_BACK:
@@ -590,7 +605,7 @@ static void window_ride_construction_toolupdate()
 
 	switch (widgetIndex) {
 	case WIDX_CONSTRUCT:
-		// RCT2_CALLPROC_X(0x006CC6A8, screenX, screenY, 0, widgetIndex, (int)w, 0, 0);
+		// RCT2_CALLPROC_X(0x006CC6A8, screenX, screenY, 0, widgetIndex, (int)w, 0, 0); return;
 
 		map_invalidate_map_selection_tiles();
 		RCT2_GLOBAL(RCT2_ADDRESS_MAP_SELECTION_FLAGS, uint16) &= ~(1 | 2 | 4);
@@ -652,8 +667,8 @@ static void window_ride_construction_toolupdate()
 		}
 		// loc_6CC91B:
 		trackBlock = ride_type_has_flag(ride->type, RIDE_TYPE_FLAG_SELLS_FOOD) ?
-			RCT2_ADDRESS(0x00994638, rct_preview_track*)[trackType] :
-			RCT2_ADDRESS(0x00994A38, rct_preview_track*)[trackType];
+			RCT2_ADDRESS(0x00994A38, rct_preview_track*)[trackType] :
+			RCT2_ADDRESS(0x00994638, rct_preview_track*)[trackType];
 
 		int bx = 0;
 		do {
@@ -669,17 +684,17 @@ static void window_ride_construction_toolupdate()
 		_currentTrackPieceZ = z;
 		if (
 			!(RCT2_GLOBAL(0x00F440B0, uint8) & 2) &&
-			x == RCT2_GLOBAL(0x00F440B9, uint16) &&
-			y == RCT2_GLOBAL(0x00F440BB, uint16) &&
-			z == RCT2_GLOBAL(0x00F440BD, uint16)
+			x == _previousTrackPieceX &&
+			y == _previousTrackPieceY &&
+			z == _previousTrackPieceZ
 		) {
 			map_invalidate_map_selection_tiles();
 			return;
 		}
 
-		RCT2_GLOBAL(0x00F440B9, uint16) = x;
-		RCT2_GLOBAL(0x00F440BB, uint16) = y;
-		RCT2_GLOBAL(0x00F440BD, uint16) = z;
+		_previousTrackPieceX = x;
+		_previousTrackPieceY = y;
+		_previousTrackPieceZ = z;
 		if (ride->type == RIDE_TYPE_MAZE) {
 			// goto loc_6CCA31
 			return;
@@ -1176,8 +1191,8 @@ static void window_ride_construction_update_enabled_track_pieces()
 	rct_ride_type *rideEntry = ride_get_entry(ride);
 
 	int rideType = RCT2_GLOBAL(0x00F440B5, uint8) & 2 ? RCT2_ADDRESS(0x0097D4F5, uint8)[ride->type * 8] : ride->type;
-	RCT2_GLOBAL(0x00F44048, uint32) = rideEntry->enabledTrackPieces & RCT2_ADDRESS(0x01357444, uint32)[rideType];
-	RCT2_GLOBAL(0x00F4404C, uint32) = rideEntry->enabledTrackPiecesAdditional & RCT2_ADDRESS(0x01357644, uint32)[rideType];
+	_enabledRidePiecesA = rideEntry->enabledTrackPieces & RCT2_ADDRESS(0x01357444, uint32)[rideType];
+	_enabledRidePiecesB = rideEntry->enabledTrackPiecesAdditional & RCT2_ADDRESS(0x01357644, uint32)[rideType];
 }
 
 /**
@@ -1379,11 +1394,11 @@ static void window_ride_construction_update_possible_ride_configurations()
 		edi = ride->type;
 
 	int currentPossibleRideConfigurationIndex = 0;
-	RCT2_GLOBAL(0x00F4407A, uint16) = 0;
+	_numCurrentPossibleSpecialTrackPieces = 0;
 	for (trackType = 0; trackType < 256; trackType++) {
 		edx = ride_type_has_flag(ride->type, RIDE_TYPE_FLAG_SELLS_FOOD) ?
-			RCT2_GLOBAL(0x00997C9D + (trackType * 8), uint8) :
-			RCT2_GLOBAL(0x0099849D + (trackType * 8), uint8);
+			RCT2_GLOBAL(0x0099849D + (trackType * 8), uint8) :
+			RCT2_GLOBAL(0x00997C9D + (trackType * 8), uint8);
 
 		if (edx == 0)
 			continue;
@@ -1392,22 +1407,20 @@ static void window_ride_construction_update_possible_ride_configurations()
 			edx &= 0x7F;
 			if (edx != edi)
 				continue;
-		} else {
-			if (edx <= 32) {
-				if (!(RCT2_GLOBAL(0x00F44048, uint32) & (1 << edx)))
-					continue;
-			} else {
-				edx -= 32;
-				if (!RCT2_GLOBAL(0x00F4404C, uint32) & edx)
-					continue;
-			}
+		} else if (!(_enabledRidePieces & (1ULL << edx))) {
+			continue;
 		}
 
 		int slope, bank;
-		if (_rideConstructionState != RIDE_CONSTRUCTION_STATE_FRONT && _rideConstructionState != RIDE_CONSTRUCTION_STATE_PLACE) {
-			if (_rideConstructionState != RIDE_CONSTRUCTION_STATE_BACK)
-				continue;
-
+		if (_rideConstructionState == RIDE_CONSTRUCTION_STATE_FRONT || _rideConstructionState == RIDE_CONSTRUCTION_STATE_PLACE) {
+			if (ride_type_has_flag(ride->type, RIDE_TYPE_FLAG_SELLS_FOOD)) {
+				slope = RCT2_GLOBAL(0x0099849F + (trackType * 8), uint8);
+				bank = RCT2_GLOBAL(0x009984A1 + (trackType * 8), uint8);
+			} else {
+				slope = RCT2_GLOBAL(0x00997C9F + (trackType * 8), uint8);
+				bank = RCT2_GLOBAL(0x00997CA1 + (trackType * 8), uint8);
+			}
+		} else if (_rideConstructionState == RIDE_CONSTRUCTION_STATE_BACK) {
 			if (ride_type_has_flag(ride->type, RIDE_TYPE_FLAG_SELLS_FOOD)) {
 				slope = RCT2_GLOBAL(0x0099849E + (trackType * 8), uint8);
 				bank = RCT2_GLOBAL(0x009984A0 + (trackType * 8), uint8);
@@ -1416,13 +1429,7 @@ static void window_ride_construction_update_possible_ride_configurations()
 				bank = RCT2_GLOBAL(0x00997CA0 + (trackType * 8), uint8);
 			}
 		} else {
-			if (ride_type_has_flag(ride->type, RIDE_TYPE_FLAG_SELLS_FOOD)) {
-				slope = RCT2_GLOBAL(0x0099849F + (trackType * 8), uint8);
-				bank = RCT2_GLOBAL(0x009984A1 + (trackType * 8), uint8);
-			} else {
-				slope = RCT2_GLOBAL(0x00997C9F + (trackType * 8), uint8);
-				bank = RCT2_GLOBAL(0x00997CA1 + (trackType * 8), uint8);
-			}
+			continue;
 		}
 
 		if (!ride_type_has_flag(ride->type, RIDE_TYPE_FLAG_SELLS_FOOD)) {
@@ -1452,7 +1459,7 @@ static void window_ride_construction_update_possible_ride_configurations()
 			(trackType != 66 || ride_type_has_flag(ride->type, RIDE_TYPE_FLAG_29))
 		) {
 			RCT2_GLOBAL(0x00F4409C, uint32) &= ~(1 << currentPossibleRideConfigurationIndex);
-			RCT2_GLOBAL(0x00F4407A, uint16)++;
+			_numCurrentPossibleSpecialTrackPieces++;
 		}
 		currentPossibleRideConfigurationIndex++;
 	}
@@ -1486,13 +1493,13 @@ static void window_ride_construction_update_widgets(rct_window *w)
 		window_ride_construction_widgets[WIDX_EXIT].type = WWT_DROPDOWN_BUTTON;
 	}
 	
-	if (RCT2_GLOBAL(0x00F4407A, uint16) == 0) {
+	if (_numCurrentPossibleSpecialTrackPieces == 0) {
 		window_ride_construction_widgets[WIDX_SPECIAL_TRACK_DROPDOWN].type = WWT_EMPTY;
 	} else {
 		window_ride_construction_widgets[WIDX_SPECIAL_TRACK_DROPDOWN].type = WWT_DROPDOWN_BUTTON;
 	}
 
-	if (RCT2_GLOBAL(0x00F44048, uint32) & (1 << 1)) {
+	if (_enabledRidePieces & (1ULL << 1)) {
 		window_ride_construction_widgets[WIDX_STRAIGHT].type = WWT_FLATBTN;
 	} else {
 		window_ride_construction_widgets[WIDX_STRAIGHT].type = WWT_EMPTY;
@@ -1896,8 +1903,8 @@ static void window_ride_construction_select_map_tiles(rct_ride *ride, int trackT
 	int offsetX, offsetY;
 
 	trackBlock = ride_type_has_flag(ride->type, RIDE_TYPE_FLAG_SELLS_FOOD) ?
-		RCT2_ADDRESS(0x00994638, rct_preview_track*)[trackType] :
-		RCT2_ADDRESS(0x00994A38, rct_preview_track*)[trackType];
+		RCT2_ADDRESS(0x00994A38, rct_preview_track*)[trackType] :
+		RCT2_ADDRESS(0x00994638, rct_preview_track*)[trackType];
 
 	trackDirection &= 3;
 	int selectionTileIndex = 0;
