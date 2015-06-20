@@ -472,25 +472,25 @@ static void window_ride_construction_mouseup()
 	case WIDX_CLOSE:
 		window_close(w);
 		break;
-	case 27:
+	case WIDX_NEXT_SECTION:
 		RCT2_CALLPROC_X(0x006C9296, 0, 0, 0, widgetIndex, (int)w, 0, 0);
 		break;
-	case 26:
+	case WIDX_PREVIOUS_SECTION:
 		RCT2_CALLPROC_X(0x006C93B8, 0, 0, 0, widgetIndex, (int)w, 0, 0);
 		break;
-	case 23:
+	case WIDX_CONSTRUCT:
 		RCT2_CALLPROC_X(0x006C9F72, 0, 0, 0, widgetIndex, (int)w, 0, 0);
 		break;
 	case WIDX_DEMOLISH:
 		window_ride_construction_mouseup_demolish(w);
 		break;
-	case 32:
+	case WIDX_ROTATE:
 		RCT2_CALLPROC_X(0x006C78AA, 0, 0, 0, widgetIndex, (int)w, 0, 0);
 		break;
-	case 29:
+	case WIDX_ENTRANCE:
 		RCT2_CALLPROC_X(0x006C7802, 0, 0, 0, widgetIndex, (int)w, 0, 0);
 		break;
-	case 30:
+	case WIDX_EXIT:
 		RCT2_CALLPROC_X(0x006C7866, 0, 0, 0, widgetIndex, (int)w, 0, 0);
 		break;
 	}
@@ -683,7 +683,7 @@ static void window_ride_construction_toolupdate()
 		_currentTrackPieceY = y;
 		_currentTrackPieceZ = z;
 		if (
-			!(RCT2_GLOBAL(0x00F440B0, uint8) & 2) &&
+			(RCT2_GLOBAL(0x00F440B0, uint8) & 2) &&
 			x == _previousTrackPieceX &&
 			y == _previousTrackPieceY &&
 			z == _previousTrackPieceZ
@@ -753,7 +753,7 @@ static void window_ride_construction_toolupdate()
 			unk != RCT2_GLOBAL(0x00F440C4, uint8)
 		) {
 			_currentTrackPrice = ride_get_entrance_or_exit_price(
-				x, y, direction, _currentRideIndex, RCT2_GLOBAL(0x00F44191, uint8), unk
+				_currentRideIndex, x, y, direction, RCT2_GLOBAL(0x00F44191, uint8), unk
 			);
 			sub_6C84CE();
 		}

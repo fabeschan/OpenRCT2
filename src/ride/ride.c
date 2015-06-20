@@ -980,8 +980,8 @@ bool sub_6C683D(int x, int y, int z, int direction, int type, int flags, int col
 
 	ride = GET_RIDE(mapElement->properties.track.ride_index);
 	trackBlock = ride_type_has_flag(ride->type, RIDE_TYPE_FLAG_SELLS_FOOD) ?
-		RCT2_ADDRESS(0x00994638, rct_preview_track*)[type] :
-		RCT2_ADDRESS(0x00994A38, rct_preview_track*)[type];
+		RCT2_ADDRESS(0x00994A38, rct_preview_track*)[type] :
+		RCT2_ADDRESS(0x00994638, rct_preview_track*)[type];
 
 	// Get the first track element in the block sequence
 	trackPart = &trackBlock[mapElement->properties.track.sequence & 0x0F];
@@ -1145,7 +1145,7 @@ void sub_6C96C0()
 			if (trackElement != NULL) {
 				game_do_command(
 					x,
-					105 | (direction & 3),
+					105 | ((direction & 3) << 8),
 					y,
 					trackElement->properties.track.type | ((trackElement->properties.track.sequence & 0x0F) << 8),
 					GAME_COMMAND_4,
@@ -4720,13 +4720,13 @@ void ride_all_has_any_track_elements(bool *rideIndexArray)
  *
  * rct2: 0x006CA28C
  */
-money32 ride_get_entrance_or_exit_price(int rideIndex, int x, int y, int direction, int dl, int di)
+money32 ride_get_entrance_or_exit_price(int rideIndex, int x, int y, int direction, int dh, int di)
 {
 	int eax, ebx, ecx, edx, esi, edi, ebp;
 	eax = x;
 	ebx = direction << 8;
 	ecx = y;
-	edx = rideIndex | (dl << 8);
+	edx = rideIndex | (dh << 8);
 	edi = di;
 	RCT2_CALLFUNC_X(0x006CA28C, &eax, &ebx, &ecx, &edx, &esi, &edi, &ebp);
 	return ebx;
