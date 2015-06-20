@@ -367,7 +367,7 @@ int ride_find_track_gap(rct_xy_element *input, rct_xy_element *output)
 		return 0;
 	
 	w = window_find_by_class(WC_RIDE_CONSTRUCTION);
-	if (w != NULL && RCT2_GLOBAL(0x00F440A6, uint8) != 0 && RCT2_GLOBAL(0x00F440A7, uint8) == rideIndex)
+	if (w != NULL && RCT2_GLOBAL(0x00F440A6, uint8) != RIDE_CONSTRUCTION_STATE_0 && RCT2_GLOBAL(0x00F440A7, uint8) == rideIndex)
 		sub_6C9627();
 
 	loopTrackElement = NULL;
@@ -545,7 +545,7 @@ static rct_window *ride_create_or_find_construction_window(int rideIndex)
 	if (w == NULL || w->number != rideIndex) {
 		window_close_construction_windows();
 		RCT2_GLOBAL(0x00F440A7, uint8) = rideIndex;
-		w = window_construction_open(rideIndex);
+		w = window_ride_construction_open(rideIndex);
 	} else {
 		sub_6C9627();
 		RCT2_GLOBAL(0x00F440A7, uint8) = rideIndex;
@@ -602,15 +602,6 @@ void ride_construct(int rideIndex)
 	} else {
 		sub_6CC3FB(rideIndex);
 	}
-}
-
-/**
- * 
- * rct2: 0x006C84CE
- */
-static void sub_6C84CE()
-{
-	RCT2_CALLPROC_X(0x006C84CE, 0, 0, 0, 0, 0, 0, 0);
 }
 
 /**
@@ -788,7 +779,7 @@ void ride_remove_peeps(int rideIndex)
  * di : output_element
  * bp : flags
  */
-int sub_6C683D(int* x, int* y, int* z, int direction, int type, uint16 extra_params, rct_map_element** output_element, uint16 flags)
+int sub_6C683D_head(int* x, int* y, int* z, int direction, int type, uint16 extra_params, rct_map_element** output_element, uint16 flags)
 {
 	rct_map_element* map_element = map_get_first_element_at(*x / 32, *y / 32);
 	rct_map_element* success_map = NULL;
@@ -809,7 +800,7 @@ int sub_6C683D(int* x, int* y, int* z, int direction, int type, uint16 extra_par
 		success_map = map_element;
 		if (!(map_element->properties.track.sequence & 0xF))
 			break;
-	}while(!map_element_is_last_for_tile(map_element++));
+	} while (!map_element_is_last_for_tile(map_element++));
 
 	map_element = success_map;
 
@@ -823,8 +814,7 @@ int sub_6C683D(int* x, int* y, int* z, int direction, int type, uint16 extra_par
 
 	if (RCT2_ADDRESS(RCT2_ADDRESS_RIDE_FLAGS, uint32)[ride->type * 2] & RIDE_TYPE_FLAG_FLAT_RIDE){
 		trackBlock = RCT2_ADDRESS(0x00994A38, rct_preview_track*)[type];
-	}
-	else{
+	} else{
 		trackBlock = RCT2_ADDRESS(0x00994638, rct_preview_track*)[type];
 	}
 
@@ -945,32 +935,241 @@ int sub_6C683D(int* x, int* y, int* z, int direction, int type, uint16 extra_par
 	return 0;
 }
 
+/**
+ * 
+ * rct2: 0x006C683D
+ * x: ax
+ * y: cx
+ * z: dx
+ * direction: bh
+ * type: bl
+ * flags: bp
+ * colourRelated: si
+ * outElement: [ax, cx, edi]
+ */
+bool sub_6C683D(int x, int y, int z, int direction, int type, int flags, int colourRelated, rct_xy_element *outElement)
+{
+	// int ebx = (direction << 8) | type;
+	// return RCT2_CALLFUNC_X(0x006C683D, x, &ebx, y, &z, &esi, &edi, &ebp)&0x100;
+
+	rct_ride *ride;
+	rct_map_element *mapElement, *resultMapElement;
+	rct_preview_track *trackBlock, *trackPart;
+	int baseZ, offsetX, offsetY;
+	
+	baseZ = z >> 3;
+	resultMapElement = NULL;
+	mapElement = map_get_first_element_at(x >> 5, y >> 5);
+	do {
+		if (mapElement->base_height != baseZ)
+			continue;
+		if (map_element_get_type(mapElement) != MAP_ELEMENT_TYPE_TRACK)
+			continue;
+		if (map_element_get_direction(mapElement) != direction)
+			continue;
+		if (mapElement->properties.track.type != type)
+			continue;
+
+		resultMapElement = mapElement;
+		if ((mapElement->properties.track.sequence & 0x0F) == 0)
+			break;
+	} while (!map_element_is_last_for_tile(mapElement++));
+	mapElement = resultMapElement;
+	if (mapElement == NULL)
+		return true;
+
+	ride = GET_RIDE(mapElement->properties.track.ride_index);
+	trackBlock = ride_type_has_flag(ride->type, RIDE_TYPE_FLAG_SELLS_FOOD) ?
+		RCT2_ADDRESS(0x00994638, rct_preview_track*)[type] :
+		RCT2_ADDRESS(0x00994A38, rct_preview_track*)[type];
+
+	// Get the first track element in the block sequence
+	trackPart = &trackBlock[mapElement->properties.track.sequence & 0x0F];
+	switch (direction) {
+	case 0:
+		x -= trackPart->x;
+		y -= trackPart->y;
+		break;
+	case 1:
+		x -= trackPart->x;
+		y += trackPart->y;
+		break;
+	case 2:
+		x += trackPart->x;
+		y += trackPart->y;
+		break;
+	case 3:
+		x += trackPart->x;
+		y -= trackPart->y;
+		break;
+	}
+	z -= trackPart->z;
+
+	z -= trackBlock->z;
+	trackPart = trackBlock;
+	while (trackPart->var_00 != 255) {
+		switch (direction) {
+		case 0:
+			offsetX = x + trackPart->x;
+			offsetY = y + trackPart->y;
+			break;
+		case 1:
+			offsetX = x + trackPart->x;
+			offsetY = y - trackPart->y;
+			break;
+		case 2:
+			offsetX = x - trackPart->x;
+			offsetY = y - trackPart->y;
+			break;
+		case 3:
+			offsetX = x - trackPart->x;
+			offsetY = y + trackPart->y;
+			break;
+		}
+		baseZ = (z + trackPart->z) >> 3;
+		map_invalidate_tile_full(offsetX, offsetY);
+
+		mapElement = map_get_first_element_at(offsetX >> 5, offsetY >> 5);
+		do {
+			if (mapElement->base_height != baseZ)
+				continue;
+			if (map_element_get_type(mapElement) != MAP_ELEMENT_TYPE_TRACK)
+				continue;
+			if (map_element_get_direction(mapElement) != direction)
+				continue;
+			if (mapElement->properties.track.type != type)
+				continue;
+
+			goto loc_6C69E0;
+		} while (!map_element_is_last_for_tile(mapElement++));
+		// case not handled...
+
+	loc_6C69E0:
+		if (trackPart == trackBlock)
+			resultMapElement = mapElement;
+
+		if (flags & 1)
+			mapElement->type &= ~0x40;
+		if (flags & 2)
+			mapElement->type |= 0x40;
+		if (flags & 4)
+			mapElement->properties.track.colour = (colourRelated & 0xFF) | (mapElement->properties.track.colour & 0xFC);
+		if (flags & 0x20)
+			mapElement->properties.track.colour = ((colourRelated & 0xFF) << 4) | (mapElement->properties.track.colour & 0x0F);
+		if (flags & 8)
+			mapElement->properties.track.colour |= 8;
+		if (flags & 0x10)
+			mapElement->properties.track.colour &= ~8;
+
+		trackPart++;
+	}
+	z += trackBlock->z;
+
+	if (outElement != NULL) {
+		outElement->x = x;
+		outElement->y = y;
+		outElement->element = resultMapElement;
+	}
+	return false;
+}
+
+/**
+ * 
+ * rct2: 0x006C6096
+ */
+rct_map_element *sub_6C6096(int x, int y, int z, int direction)
+{
+	int eax, ebx, ecx, edx, esi, edi, ebp;
+	eax = x;
+	ecx = y;
+	edx = z;
+	ebx = direction;
+	if (RCT2_CALLFUNC_X(0x006C6096, &eax, &ebx, &ecx, &edx, &esi, &edi, &ebp) & 0x100)
+		return NULL;
+	
+	return (rct_map_element*)esi;
+}
+
+/**
+ * 
+ * rct2: 0x006C96C0
+ */
 void sub_6C96C0()
 {
-	RCT2_CALLPROC_X(0x006C96C0, 0, 0, 0, 0, 0, 0, 0);
+	// RCT2_CALLPROC_X(0x006C96C0, 0, 0, 0, 0, 0, 0, 0); return;
+
+	rct_ride *ride;
+	rct_map_element *trackElement;
+	int rideIndex, x, y, z, direction;
+
+	if (RCT2_GLOBAL(0x00F440B0, uint8) & 4) {
+		RCT2_GLOBAL(0x00F440B0, uint8) &= ~4;
+		game_do_command(
+			RCT2_GLOBAL(0x00F440BF, uint16),
+			0,
+			RCT2_GLOBAL(0x00F440C1, uint16),
+			RCT2_GLOBAL(0x00F440A7, uint8),
+			GAME_COMMAND_13,
+			RCT2_GLOBAL(0x00F440C4, uint8),
+			0
+		);
+	}
+	if (RCT2_GLOBAL(0x00F440B0, uint8) & 2) {
+		RCT2_GLOBAL(0x00F440B0, uint8) &= ~2;
+
+		rideIndex = RCT2_GLOBAL(0x00F440A7, uint8);
+		RCT2_GLOBAL(0x00F441D2, uint8) = rideIndex;
+		
+		x = RCT2_GLOBAL(0x00F440C5, uint16);
+		y = RCT2_GLOBAL(0x00F440C7, uint16);
+		z = RCT2_GLOBAL(0x00F440C9, uint16);
+
+		ride = GET_RIDE(rideIndex);
+		if (ride->type == RIDE_TYPE_MAZE) {
+			game_do_command(x     , 41 | (0 << 8), y     , rideIndex | (2 << 8), GAME_COMMAND_38, z, 0);
+			game_do_command(x     , 41 | (1 << 8), y + 16, rideIndex | (2 << 8), GAME_COMMAND_38, z, 0);
+			game_do_command(x + 16, 41 | (2 << 8), y + 16, rideIndex | (2 << 8), GAME_COMMAND_38, z, 0);
+			game_do_command(x + 16, 41 | (3 << 8), y     , rideIndex | (2 << 8), GAME_COMMAND_38, z, 0);
+		} else {
+			direction = RCT2_GLOBAL(0x00F440CB, uint8);
+			if (!(direction & 4)) {
+				x -= TileDirectionDelta[direction].x;
+				y -= TileDirectionDelta[direction].y;
+			}
+			trackElement = sub_6C6096(x, y, z, direction);
+			if (trackElement != NULL) {
+				game_do_command(
+					x,
+					105 | (direction & 3),
+					y,
+					trackElement->properties.track.type | ((trackElement->properties.track.sequence & 0x0F) << 8),
+					GAME_COMMAND_4,
+					z,
+					0
+				);
+			}
+		}
+	}
 }
 
 void sub_6C9627()
 {
 	switch (RCT2_GLOBAL(0x00F440A6, uint8)) {
-	case 3:
-	{
-		int x = RCT2_GLOBAL(0x00F440A8, uint16), y = RCT2_GLOBAL(0x00F440AA, uint16), z = RCT2_GLOBAL(0x00F440AC, uint16);
+	case RIDE_CONSTRUCTION_STATE_SELECTED:
 		sub_6C683D(
-			&x,
-			&y,
-			&z,
+			RCT2_GLOBAL(0x00F440A8, uint16),
+			RCT2_GLOBAL(0x00F440AA, uint16),
+			RCT2_GLOBAL(0x00F440AC, uint16),
 			RCT2_GLOBAL(RCT2_ADDRESS_TRACK_PREVIEW_ROTATION, uint8) & 3,
 			RCT2_GLOBAL(0x00F440AF, uint8),
+			1,
 			0,
-			0,
-			1
-			); 
-	}
+			NULL
+		);
 		break;
-	case 6:
-	case 7:
-	case 8:
+	case RIDE_CONSTRUCTION_STATE_6:
+	case RIDE_CONSTRUCTION_STATE_7:
+	case RIDE_CONSTRUCTION_STATE_8:
 		if (RCT2_GLOBAL(0x00F440B0, uint8) & 1) {
 			map_invalidate_tile_full(
 				RCT2_GLOBAL(0x00F440A8, uint16) & 0xFFE0,
@@ -1038,7 +1237,7 @@ static int ride_modify_entrance_or_exit(rct_map_element *mapElement, int x, int 
 
 	sub_6C9627();
 	if (
-		RCT2_GLOBAL(0x00F440A6, uint8) != 5 ||
+		RCT2_GLOBAL(0x00F440A6, uint8) != RIDE_CONSTRUCTION_STATE_ENTRANCE_EXIT ||
 		!(RCT2_GLOBAL(RCT2_ADDRESS_INPUT_FLAGS, uint8) & INPUT_FLAG_TOOL_ACTIVE) ||
 		RCT2_GLOBAL(RCT2_ADDRESS_TOOL_WINDOWCLASS, rct_windowclass) != WC_RIDE_CONSTRUCTION
 	) {
@@ -1049,8 +1248,8 @@ static int ride_modify_entrance_or_exit(rct_map_element *mapElement, int x, int 
 		RCT2_GLOBAL(0x00F44193, uint8) = bl;
 		RCT2_GLOBAL(RCT2_ADDRESS_INPUT_FLAGS, uint8) |= INPUT_FLAG_6;
 		int al = RCT2_GLOBAL(0x00F440A6, uint8);
-		if (al != 5) {
-			RCT2_GLOBAL(0x00F440A6, uint8) = 5;
+		if (al != RIDE_CONSTRUCTION_STATE_ENTRANCE_EXIT) {
+			RCT2_GLOBAL(0x00F440A6, uint8) = RIDE_CONSTRUCTION_STATE_ENTRANCE_EXIT;
 			RCT2_GLOBAL(0x00F440CC, uint8) = al;
 		}
 
@@ -1074,7 +1273,7 @@ static int ride_modify_entrance_or_exit(rct_map_element *mapElement, int x, int 
 int ride_modify_maze(rct_map_element *mapElement, int x, int y)
 {
 	RCT2_GLOBAL(0x00F440A7, uint8) = mapElement->properties.track.ride_index;
-	RCT2_GLOBAL(0x00F440A6, uint8) = 6;
+	RCT2_GLOBAL(0x00F440A6, uint8) = RIDE_CONSTRUCTION_STATE_6;
 	RCT2_GLOBAL(0x00F440A8, uint16) = x;
 	RCT2_GLOBAL(0x00F440AA, uint16) = y;
 	RCT2_GLOBAL(0x00F440AC, uint16) = mapElement->base_height * 8;
@@ -1139,11 +1338,14 @@ int ride_modify(rct_xy_element *input)
 	direction = mapElement.element->type & 3;
 	type = mapElement.element->properties.track.type;
 	
-	if (sub_6C683D(&x, &y, &z, direction, type, 0, 0, 0))
+	if (sub_6C683D(x, y, z, direction, type, 0, 0, &mapElement))
 		return 0;
 
+	x = mapElement.x;
+	y = mapElement.y;
+
 	RCT2_GLOBAL(0x00F440A7, uint8) = rideIndex;
-	RCT2_GLOBAL(0x00F440A6, uint8) = 3;
+	RCT2_GLOBAL(0x00F440A6, uint8) = RIDE_CONSTRUCTION_STATE_SELECTED;
 	RCT2_GLOBAL(0x00F440A8, uint16) = x;
 	RCT2_GLOBAL(0x00F440AA, uint16) = y;
 	RCT2_GLOBAL(0x00F440AC, uint16) = z;
@@ -1158,12 +1360,12 @@ int ride_modify(rct_xy_element *input)
 	}
 
 	sub_6C9296();
-	if (RCT2_GLOBAL(0x00F440A6, uint8) == 1) {
+	if (RCT2_GLOBAL(0x00F440A6, uint8) == RIDE_CONSTRUCTION_STATE_FRONT) {
 		sub_6C84CE();
 		return 1;
 	}
 
-	RCT2_GLOBAL(0x00F440A6, uint8) = 3;
+	RCT2_GLOBAL(0x00F440A6, uint8) = RIDE_CONSTRUCTION_STATE_SELECTED;
 	RCT2_GLOBAL(0x00F440A8, uint16) = x;
 	RCT2_GLOBAL(0x00F440AA, uint16) = y;
 	RCT2_GLOBAL(0x00F440AC, uint16) = z;
@@ -1174,8 +1376,8 @@ int ride_modify(rct_xy_element *input)
 
 	sub_6C93B8();
 
-	if (RCT2_GLOBAL(0x00F440A6, uint8) != 2) {
-		RCT2_GLOBAL(0x00F440A6, uint8) = 3;
+	if (RCT2_GLOBAL(0x00F440A6, uint8) != RIDE_CONSTRUCTION_STATE_BACK) {
+		RCT2_GLOBAL(0x00F440A6, uint8) = RIDE_CONSTRUCTION_STATE_SELECTED;
 		RCT2_GLOBAL(0x00F440A8, uint16) = x;
 		RCT2_GLOBAL(0x00F440AA, uint16) = y;
 		RCT2_GLOBAL(0x00F440AC, uint16) = z;
@@ -1227,7 +1429,7 @@ int sub_6CC3FB(int rideIndex)
 	RCT2_GLOBAL(0x00F440B7, uint8) = 0;
 
 	RCT2_GLOBAL(RCT2_ADDRESS_TRACK_PREVIEW_ROTATION, uint8) = 0;
-	RCT2_GLOBAL(0x00F440A6, uint8) = 4;
+	RCT2_GLOBAL(0x00F440A6, uint8) = RIDE_CONSTRUCTION_STATE_PLACE;
 	RCT2_GLOBAL(0x00F440B0, uint8) = 0;
 	RCT2_GLOBAL(0x00F440B1, uint8) = 0;
 	RCT2_GLOBAL(0x00F44159, uint8) = 0;
@@ -3339,7 +3541,7 @@ int ride_check_block_brakes(rct_xy_element *input, rct_xy_element *output)
 	trackElement = *input;
 	rideIndex = trackElement.element->properties.track.ride_index;
 	w = window_find_by_class(WC_RIDE_CONSTRUCTION);
-	if (w != NULL && RCT2_GLOBAL(0x00F440A6, uint8) != 0 && RCT2_GLOBAL(0x00F440A7, uint8) == rideIndex)
+	if (w != NULL && RCT2_GLOBAL(0x00F440A6, uint8) != RIDE_CONSTRUCTION_STATE_0 && RCT2_GLOBAL(0x00F440A7, uint8) == rideIndex)
 		sub_6C9627();
 
 	loopTrackElement = NULL;
@@ -4507,4 +4709,37 @@ void ride_all_has_any_track_elements(bool *rideIndexArray)
 
 		rideIndexArray[it.element->properties.track.ride_index] = true;
 	}
+}
+
+/**
+ *
+ * rct2: 0x006CA28C
+ */
+money32 ride_get_entrance_or_exit_price(int rideIndex, int x, int y, int direction, int dl, int di)
+{
+	int eax, ebx, ecx, edx, esi, edi, ebp;
+	eax = x;
+	ebx = direction << 8;
+	ecx = y;
+	edx = rideIndex | (dl << 8);
+	edi = di;
+	RCT2_CALLFUNC_X(0x006CA28C, &eax, &ebx, &ecx, &edx, &esi, &edi, &ebp);
+	return ebx;
+
+}
+
+/**
+ * 
+ * rct2: 0x006CCF70
+ */
+void ride_get_entrance_or_exit_position_from_screen_position(int x, int y, int *outX, int *outY, int *outDirection)
+{
+	int eax, ebx, ecx, edx, esi, edi, ebp;
+	eax = x;
+	ebx = y;
+	RCT2_CALLFUNC_X(0x006CCF70, &eax, &ebx, &ecx, &edx, &esi, &edi, &ebp);
+	
+	if (outX != NULL) *outX = eax & 0xFFFF;
+	if (outY != NULL) *outY = ecx & 0xFFFF;
+	if (outDirection != NULL) *outDirection = ebx & 0xFF;
 }

@@ -742,6 +742,18 @@ enum {
 	RIDE_CRASH_TYPE_FATALITIES = 8
 };
 
+enum {
+	RIDE_CONSTRUCTION_STATE_0,
+	RIDE_CONSTRUCTION_STATE_FRONT,
+	RIDE_CONSTRUCTION_STATE_BACK,
+	RIDE_CONSTRUCTION_STATE_SELECTED,
+	RIDE_CONSTRUCTION_STATE_PLACE,
+	RIDE_CONSTRUCTION_STATE_ENTRANCE_EXIT,
+	RIDE_CONSTRUCTION_STATE_6,
+	RIDE_CONSTRUCTION_STATE_7,
+	RIDE_CONSTRUCTION_STATE_8
+};
+
 #define MAX_RIDES 255
 
 #define MAX_RIDE_MEASUREMENTS 8
@@ -804,7 +816,8 @@ void ride_breakdown_add_news_item(int rideIndex);
 rct_peep *ride_find_closest_mechanic(rct_ride *ride, int forInspection);
 int sub_6CC3FB(int rideIndex);
 void sub_6C9627();
-int sub_6C683D(int* x, int* y, int* z, int direction, int type, uint16 extra_params, rct_map_element** output_element, uint16 flags);
+int sub_6C683D_head(int* x, int* y, int* z, int direction, int type, uint16 extra_params, rct_map_element** output_element, uint16 flags);
+bool sub_6C683D(int x, int y, int z, int direction, int type, int flags, int colourRelated, rct_xy_element *outElement);
 void ride_set_map_tooltip(rct_map_element *mapElement);
 int ride_music_params_update(sint16 x, sint16 y, sint16 z, uint8 rideIndex, uint16 sampleRate, uint32 position, uint8 *tuneId);
 void ride_music_update_final();
@@ -845,5 +858,10 @@ bool ride_type_has_flag(int rideType, int flag);
 bool ride_is_powered_launched(rct_ride *ride);
 bool ride_has_any_track_elements(int rideIndex);
 void ride_all_has_any_track_elements(bool *rideIndexArray);
+
+void sub_6C84CE();
+void sub_6C96C0();
+money32 ride_get_entrance_or_exit_price(int rideIndex, int x, int y, int direction, int dl, int di);
+void ride_get_entrance_or_exit_position_from_screen_position(int x, int y, int *outX, int *outY, int *outDirection);
 
 #endif
