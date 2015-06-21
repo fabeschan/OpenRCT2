@@ -979,7 +979,7 @@ bool sub_6C683D(int x, int y, int z, int direction, int type, int flags, int col
 		return true;
 
 	ride = GET_RIDE(mapElement->properties.track.ride_index);
-	trackBlock = ride_type_has_flag(ride->type, RIDE_TYPE_FLAG_SELLS_FOOD) ?
+	trackBlock = ride_type_has_flag(ride->type, RIDE_TYPE_FLAG_FLAT_RIDE) ?
 		RCT2_ADDRESS(0x00994A38, rct_preview_track*)[type] :
 		RCT2_ADDRESS(0x00994638, rct_preview_track*)[type];
 

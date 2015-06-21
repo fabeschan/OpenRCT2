@@ -666,7 +666,7 @@ static void window_ride_construction_toolupdate()
 			// z = map_get_highest_z(x >> 5, y >> 5);
 		}
 		// loc_6CC91B:
-		trackBlock = ride_type_has_flag(ride->type, RIDE_TYPE_FLAG_SELLS_FOOD) ?
+		trackBlock = ride_type_has_flag(ride->type, RIDE_TYPE_FLAG_FLAT_RIDE) ?
 			RCT2_ADDRESS(0x00994A38, rct_preview_track*)[trackType] :
 			RCT2_ADDRESS(0x00994638, rct_preview_track*)[trackType];
 
@@ -892,7 +892,7 @@ static void window_ride_construction_draw_track_piece(
 
 	ride = GET_RIDE(rideIndex);
 
-	trackBlock = ride_type_has_flag(ride->type, RIDE_TYPE_FLAG_SELLS_FOOD) ?
+	trackBlock = ride_type_has_flag(ride->type, RIDE_TYPE_FLAG_FLAT_RIDE) ?
 		RCT2_ADDRESS(0x00994A38, rct_preview_track*)[trackType] :
 		RCT2_ADDRESS(0x00994638, rct_preview_track*)[trackType];
 
@@ -931,7 +931,7 @@ static void window_ride_construction_draw_track_piece(
 	y = 4112 + (y / 2);
 	z = 1024 + z;
 
-	short bx = ride_type_has_flag(ride->type, RIDE_TYPE_FLAG_SELLS_FOOD) ?
+	short bx = ride_type_has_flag(ride->type, RIDE_TYPE_FLAG_FLAT_RIDE) ?
 		RCT2_GLOBAL(0x009984A2 + trackType * 8, sint8) :
 		RCT2_GLOBAL(0x00997CA2 + trackType * 8, sint8);
 
@@ -1026,7 +1026,7 @@ static void sub_6CBCE2(
 	RCT2_GLOBAL(RCT2_ADDRESS_MAP_SIZE, uint16) = 256;
 	RCT2_GLOBAL(RCT2_ADDRESS_MAP_MAX_XY, uint16) = (256 * 32) - 1;
 
-	trackBlock = ride_type_has_flag(ride->type, RIDE_TYPE_FLAG_SELLS_FOOD) ?
+	trackBlock = ride_type_has_flag(ride->type, RIDE_TYPE_FLAG_FLAT_RIDE) ?
 		RCT2_ADDRESS(0x00994A38, rct_preview_track*)[trackType] :
 		RCT2_ADDRESS(0x00994638, rct_preview_track*)[trackType];
 
@@ -1228,7 +1228,7 @@ money32 sub_6CA162(int rideIndex, int trackType, int trackDirection, int edxRS16
 
 		RCT2_GLOBAL(0x00F440C5, uint16) = x;
 		RCT2_GLOBAL(0x00F440C7, uint16) = y;
-		z += ride_type_has_flag(ride->type, RIDE_TYPE_FLAG_SELLS_FOOD) ?
+		z += ride_type_has_flag(ride->type, RIDE_TYPE_FLAG_FLAT_RIDE) ?
 			RCT2_GLOBAL(0x009972BD + (trackType * 10), uint16) :
 			RCT2_GLOBAL(0x009968BD + (trackType * 10), uint16);
 		
@@ -1396,7 +1396,7 @@ static void window_ride_construction_update_possible_ride_configurations()
 	int currentPossibleRideConfigurationIndex = 0;
 	_numCurrentPossibleSpecialTrackPieces = 0;
 	for (trackType = 0; trackType < 256; trackType++) {
-		edx = ride_type_has_flag(ride->type, RIDE_TYPE_FLAG_SELLS_FOOD) ?
+		edx = ride_type_has_flag(ride->type, RIDE_TYPE_FLAG_FLAT_RIDE) ?
 			RCT2_GLOBAL(0x0099849D + (trackType * 8), uint8) :
 			RCT2_GLOBAL(0x00997C9D + (trackType * 8), uint8);
 
@@ -1413,7 +1413,7 @@ static void window_ride_construction_update_possible_ride_configurations()
 
 		int slope, bank;
 		if (_rideConstructionState == RIDE_CONSTRUCTION_STATE_FRONT || _rideConstructionState == RIDE_CONSTRUCTION_STATE_PLACE) {
-			if (ride_type_has_flag(ride->type, RIDE_TYPE_FLAG_SELLS_FOOD)) {
+			if (ride_type_has_flag(ride->type, RIDE_TYPE_FLAG_FLAT_RIDE)) {
 				slope = RCT2_GLOBAL(0x0099849F + (trackType * 8), uint8);
 				bank = RCT2_GLOBAL(0x009984A1 + (trackType * 8), uint8);
 			} else {
@@ -1421,7 +1421,7 @@ static void window_ride_construction_update_possible_ride_configurations()
 				bank = RCT2_GLOBAL(0x00997CA1 + (trackType * 8), uint8);
 			}
 		} else if (_rideConstructionState == RIDE_CONSTRUCTION_STATE_BACK) {
-			if (ride_type_has_flag(ride->type, RIDE_TYPE_FLAG_SELLS_FOOD)) {
+			if (ride_type_has_flag(ride->type, RIDE_TYPE_FLAG_FLAT_RIDE)) {
 				slope = RCT2_GLOBAL(0x0099849E + (trackType * 8), uint8);
 				bank = RCT2_GLOBAL(0x009984A0 + (trackType * 8), uint8);
 			} else {
@@ -1432,7 +1432,7 @@ static void window_ride_construction_update_possible_ride_configurations()
 			continue;
 		}
 
-		if (!ride_type_has_flag(ride->type, RIDE_TYPE_FLAG_SELLS_FOOD)) {
+		if (!ride_type_has_flag(ride->type, RIDE_TYPE_FLAG_FLAT_RIDE)) {
 			if (
 				RCT2_GLOBAL(0x00997C9D + (trackType * 8), uint8) == 21 ||
 				RCT2_GLOBAL(0x00997C9D + (trackType * 8), uint8) != 22
@@ -1902,7 +1902,7 @@ static void window_ride_construction_select_map_tiles(rct_ride *ride, int trackT
 	rct_preview_track *trackBlock;
 	int offsetX, offsetY;
 
-	trackBlock = ride_type_has_flag(ride->type, RIDE_TYPE_FLAG_SELLS_FOOD) ?
+	trackBlock = ride_type_has_flag(ride->type, RIDE_TYPE_FLAG_FLAT_RIDE) ?
 		RCT2_ADDRESS(0x00994A38, rct_preview_track*)[trackType] :
 		RCT2_ADDRESS(0x00994638, rct_preview_track*)[trackType];
 
