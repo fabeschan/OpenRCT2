@@ -256,7 +256,14 @@ static void* window_ride_construction_events[] = {
 
 #pragma endregion
 
+static void window_ride_construction_next_section(rct_window *w);
+static void window_ride_construction_previous_section(rct_window *w);
+static void window_ride_construction_construct(rct_window *w);
 static void window_ride_construction_mouseup_demolish(rct_window* w);
+static void window_ride_construction_rotate(rct_window *w);
+static void window_ride_construction_entrance_click(rct_window *w);
+static void window_ride_construction_exit_click(rct_window *w);
+
 static void window_ride_construction_draw_track_piece(
 	rct_window *w, rct_drawpixelinfo *dpi,
 	int rideIndex, int trackType, int trackRotation, int unknown,
@@ -274,38 +281,6 @@ static void window_ride_construction_update_possible_ride_configurations();
 static void window_ride_construction_update_widgets(rct_window *w);
 static void window_ride_construction_select_map_tiles(rct_ride *ride, int trackType, int trackDirection, int x, int y);
 money32 sub_6CA162(int rideIndex, int trackType, int trackDirection, int edxRS16, int x, int y, int z);
-
-#define _enabledRidePieces							RCT2_GLOBAL(0x00F44048, uint64)
-#define _enabledRidePiecesA							RCT2_GLOBAL(0x00F44048, uint32)
-#define _enabledRidePiecesB							RCT2_GLOBAL(0x00F4404C, uint32)
-
-#define _currentTrackPrice							RCT2_GLOBAL(0x00F44070, money32)
-
-#define _numCurrentPossibleRideConfigurations		RCT2_GLOBAL(0x00F44078, uint16)
-#define _numCurrentPossibleSpecialTrackPieces		RCT2_GLOBAL(0x00F4407A, uint16)
-
-#define _previousTrackPieceSlope					RCT2_GLOBAL(0x00F440A0, uint16)
-
-#define _rideConstructionState						RCT2_GLOBAL(0x00F440A6, uint8)
-#define _currentRideIndex							RCT2_GLOBAL(0x00F440A7, uint8)
-#define _currentTrackPieceX							RCT2_GLOBAL(0x00F440A8, uint16)
-#define _currentTrackPieceY							RCT2_GLOBAL(0x00F440AA, uint16)
-#define _currentTrackPieceZ							RCT2_GLOBAL(0x00F440AC, uint16)
-#define _currentTrackPieceDirection					RCT2_GLOBAL(0x00F440AE, uint8)
-#define _currentTrackPieceType						RCT2_GLOBAL(0x00F440AF, uint8)
-
-#define _previousTrackPieceX						RCT2_GLOBAL(0x00F440B9, uint16)
-#define _previousTrackPieceY						RCT2_GLOBAL(0x00F440BB, uint16)
-#define _previousTrackPieceZ						RCT2_GLOBAL(0x00F440BD, uint16)
-
-#define _rideConstructionArrowPulseTime				RCT2_GLOBAL(0x00F440B1, sint8)
-
-#define _previousTrackBankStart						RCT2_GLOBAL(0x00F440B3, uint8)
-
-#define _previousTrackBankEnd						RCT2_GLOBAL(0x00F440B6, uint8)
-#define _previousTrackSlopeEnd						RCT2_GLOBAL(0x00F440B7, uint8)
-
-#define _currentSeatRotationAngle					RCT2_GLOBAL(0x00F440CF, uint8)
 
 uint8 *_currentPossibleRideConfigurations = (uint8*)0x00F4407C;
 
@@ -473,27 +448,36 @@ static void window_ride_construction_mouseup()
 		window_close(w);
 		break;
 	case WIDX_NEXT_SECTION:
-		RCT2_CALLPROC_X(0x006C9296, 0, 0, 0, widgetIndex, (int)w, 0, 0);
+		ride_select_next_section();
 		break;
 	case WIDX_PREVIOUS_SECTION:
-		RCT2_CALLPROC_X(0x006C93B8, 0, 0, 0, widgetIndex, (int)w, 0, 0);
+		ride_select_previous_section();
 		break;
 	case WIDX_CONSTRUCT:
-		RCT2_CALLPROC_X(0x006C9F72, 0, 0, 0, widgetIndex, (int)w, 0, 0);
+		window_ride_construction_construct(w);
 		break;
 	case WIDX_DEMOLISH:
 		window_ride_construction_mouseup_demolish(w);
 		break;
 	case WIDX_ROTATE:
-		RCT2_CALLPROC_X(0x006C78AA, 0, 0, 0, widgetIndex, (int)w, 0, 0);
+		window_ride_construction_rotate(w);
 		break;
 	case WIDX_ENTRANCE:
-		RCT2_CALLPROC_X(0x006C7802, 0, 0, 0, widgetIndex, (int)w, 0, 0);
+		window_ride_construction_entrance_click(w);
 		break;
 	case WIDX_EXIT:
-		RCT2_CALLPROC_X(0x006C7866, 0, 0, 0, widgetIndex, (int)w, 0, 0);
+		window_ride_construction_exit_click(w);
 		break;
 	}
+}
+
+/**
+ *
+ * rct2: 0x006C9F72
+ */
+static void window_ride_construction_construct(rct_window *w)
+{
+	RCT2_CALLPROC_X(0x006C9F72, 0, 0, 0, WIDX_CONSTRUCT, (int)w, 0, 0);
 }
 
 /**
@@ -525,6 +509,66 @@ static void window_ride_construction_mouseup_demolish(rct_window* w)
 
 	RCT2_GLOBAL(0x00F441D2, uint8) = _currentRideIndex;
 	//6c9BFE
+}
+
+/**
+ *
+ * rct2: 0x006C78AA
+ */
+static void window_ride_construction_rotate(rct_window *w)
+{
+	_currentTrackPieceDirection = (_currentTrackPieceDirection + 1) & 3;
+	sub_6C9627();
+	_currentTrackPrice = MONEY32_UNDEFINED;
+	sub_6C84CE();
+}
+
+/**
+ *
+ * rct2: 0x006C7802
+ */
+static void window_ride_construction_entrance_click(rct_window *w)
+{
+	if (tool_set(w, WIDX_ENTRANCE, 12)) {
+		if (!sub_6CAF80(_currentRideIndex, NULL)) {
+			sub_6CC3FB(_currentRideIndex);
+		}
+	} else {
+		RCT2_GLOBAL(0x00F44191, uint8) = 0;
+		RCT2_GLOBAL(0x00F44192, uint8) = w->number & 0xFF;
+		RCT2_GLOBAL(0x00F44193, uint8) = 0;
+		RCT2_GLOBAL(RCT2_ADDRESS_INPUT_FLAGS, uint8) |= INPUT_FLAG_6;
+		sub_6C9627();
+		if (_rideConstructionState != RIDE_CONSTRUCTION_STATE_ENTRANCE_EXIT) {
+			RCT2_GLOBAL(0x00F440CC, uint8) = _rideConstructionState;
+			_rideConstructionState = RIDE_CONSTRUCTION_STATE_ENTRANCE_EXIT;
+		}
+		sub_6C84CE();
+	}
+}
+
+/**
+ *
+ * rct2: 0x006C7866
+ */
+static void window_ride_construction_exit_click(rct_window *w)
+{
+	if (tool_set(w, WIDX_EXIT, 12)) {
+		if (!sub_6CAF80(_currentRideIndex, NULL)) {
+			sub_6CC3FB(_currentRideIndex);
+		}
+	} else {
+		RCT2_GLOBAL(0x00F44191, uint8) = 1;
+		RCT2_GLOBAL(0x00F44192, uint8) = w->number & 0xFF;
+		RCT2_GLOBAL(0x00F44193, uint8) = 0;
+		RCT2_GLOBAL(RCT2_ADDRESS_INPUT_FLAGS, uint8) |= INPUT_FLAG_6;
+		sub_6C9627();
+		if (_rideConstructionState != RIDE_CONSTRUCTION_STATE_ENTRANCE_EXIT) {
+			RCT2_GLOBAL(0x00F440CC, uint8) = _rideConstructionState;
+			_rideConstructionState = RIDE_CONSTRUCTION_STATE_ENTRANCE_EXIT;
+		}
+		sub_6C84CE();
+	}
 }
 
 /**

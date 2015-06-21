@@ -2627,18 +2627,12 @@ int tracked_ride_to_td6(uint8 rideIndex, rct_track_td6* track_design, uint8* tra
 
 	int z = 0;
 	//6ce69e
-	if (!(sub_6C6402(&trackElement.element, &trackElement.x, &trackElement.y, &z))){
+	if (track_get_previous(&trackElement, &trackElement, &z, NULL)){
 		rct_map_element* initial_map = trackElement.element;
 		do {
-			int x = trackElement.x;
-			int y = trackElement.y;
-			rct_map_element* map_element = trackElement.element;
-			if (sub_6C6402(&map_element, &x, &y, &z)){
+			if (!track_get_previous(&trackElement, &trackElement, &z, NULL)) {
 				break;
 			}
-			trackElement.x = x;
-			trackElement.y = y;
-			trackElement.element = map_element;
 		} while (initial_map != trackElement.element);
 	}
 
@@ -2731,7 +2725,7 @@ int tracked_ride_to_td6(uint8 rideIndex, rct_track_td6* track_design, uint8* tra
 		track->flags = flags;
 		track++;
 
-		if (!track_get_next(&trackElement, &trackElement))
+		if (!track_get_next(&trackElement, &trackElement, NULL, NULL))
 			break;
 
 		z = trackElement.element->base_height * 8;

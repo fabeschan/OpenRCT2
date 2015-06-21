@@ -328,7 +328,7 @@ int sub_6CAF80(int rideIndex, rct_xy_element *output)
  * 
  * rct2: 0x006C60C2
  */
-int track_get_next(rct_xy_element *input, rct_xy_element *output)
+bool track_get_next(rct_xy_element *input, rct_xy_element *output, int *z, int *direction)
 {
 	int eax, ebx, ecx, edx, esi, edi, ebp, result;
 
@@ -339,6 +339,29 @@ int track_get_next(rct_xy_element *input, rct_xy_element *output)
 	output->x = *((uint16*)&eax);
 	output->y = *((uint16*)&ecx);
 	output->element = (rct_map_element*)esi;
+	if (z != NULL) *z = (edx & 0xFFFF);
+	if (direction != NULL) *direction = (ebx & 0xFF);
+
+	return (result & 0x100) == 0;
+}
+
+/**
+ * 
+ * rct2: 0x006C6402
+ */
+bool track_get_previous(rct_xy_element *input, rct_xy_element *output, int *z, int *direction)
+{
+	int eax, ebx, ecx, edx, esi, edi, ebp;
+
+	eax = input->x;
+	ecx = input->y;
+	esi = (int)input->element;
+	int result = RCT2_CALLFUNC_X(0x006C6402, &eax, &ebx, &ecx, &edx, &esi, &edi, &ebp);
+	output->x = *((uint16*)&eax);
+	output->y = *((uint16*)&ecx);
+	output->element = (rct_map_element*)esi;
+	if (z != NULL) *z = (edx & 0xFFFF);
+	if (direction != NULL) *direction = (ebx & 0xFF);
 
 	return (result & 0x100) == 0;
 }
@@ -367,12 +390,12 @@ int ride_find_track_gap(rct_xy_element *input, rct_xy_element *output)
 		return 0;
 	
 	w = window_find_by_class(WC_RIDE_CONSTRUCTION);
-	if (w != NULL && RCT2_GLOBAL(0x00F440A6, uint8) != RIDE_CONSTRUCTION_STATE_0 && RCT2_GLOBAL(0x00F440A7, uint8) == rideIndex)
+	if (w != NULL && _rideConstructionState != RIDE_CONSTRUCTION_STATE_0 && _currentRideIndex == rideIndex)
 		sub_6C9627();
 
 	loopTrackElement = NULL;
 	while (1) {
-		if (!track_get_next(&trackElement, &nextTrackElement)) {
+		if (!track_get_next(&trackElement, &nextTrackElement, NULL, NULL)) {
 			*output = trackElement;
 			return 1;
 		}
@@ -544,11 +567,11 @@ static rct_window *ride_create_or_find_construction_window(int rideIndex)
 	w = window_find_by_class(WC_RIDE_CONSTRUCTION);
 	if (w == NULL || w->number != rideIndex) {
 		window_close_construction_windows();
-		RCT2_GLOBAL(0x00F440A7, uint8) = rideIndex;
+		_currentRideIndex = rideIndex;
 		w = window_ride_construction_open(rideIndex);
 	} else {
 		sub_6C9627();
-		RCT2_GLOBAL(0x00F440A7, uint8) = rideIndex;
+		_currentRideIndex = rideIndex;
 	}
 
 	return w;
@@ -1097,6 +1120,28 @@ rct_map_element *sub_6C6096(int *x, int *y, int *z, int *direction)
 
 /**
  * 
+ * rct2: 0x006C63D6
+ */
+rct_map_element *sub_6C63D6(int *x, int *y, int *z, int *direction)
+{
+	int eax, ebx, ecx, edx, esi, edi, ebp;
+	eax = *x;
+	ecx = *y;
+	edx = *z;
+	ebx = *direction;
+	if (RCT2_CALLFUNC_X(0x006C63D6, &eax, &ebx, &ecx, &edx, &esi, &edi, &ebp) & 0x100)
+		return NULL;
+
+	*x = (eax & 0xFFFF);
+	*y = (ecx & 0xFFFF);
+	*z = (edx & 0xFFFF);
+	*direction = (ebx & 0xFF);
+	
+	return (rct_map_element*)esi;
+}
+
+/**
+ * 
  * rct2: 0x006C96C0
  */
 void sub_6C96C0()
@@ -1113,7 +1158,7 @@ void sub_6C96C0()
 			RCT2_GLOBAL(0x00F440BF, uint16),
 			41,
 			RCT2_GLOBAL(0x00F440C1, uint16),
-			RCT2_GLOBAL(0x00F440A7, uint8),
+			_currentRideIndex,
 			GAME_COMMAND_13,
 			RCT2_GLOBAL(0x00F440C4, uint8),
 			0
@@ -1122,7 +1167,7 @@ void sub_6C96C0()
 	if (RCT2_GLOBAL(0x00F440B0, uint8) & 2) {
 		RCT2_GLOBAL(0x00F440B0, uint8) &= ~2;
 
-		rideIndex = RCT2_GLOBAL(0x00F440A7, uint8);
+		rideIndex = _currentRideIndex;
 		RCT2_GLOBAL(0x00F441D2, uint8) = rideIndex;
 		
 		x = RCT2_GLOBAL(0x00F440C5, uint16);
@@ -1159,14 +1204,14 @@ void sub_6C96C0()
 
 void sub_6C9627()
 {
-	switch (RCT2_GLOBAL(0x00F440A6, uint8)) {
+	switch (_rideConstructionState) {
 	case RIDE_CONSTRUCTION_STATE_SELECTED:
 		sub_6C683D(
-			RCT2_GLOBAL(0x00F440A8, uint16),
-			RCT2_GLOBAL(0x00F440AA, uint16),
-			RCT2_GLOBAL(0x00F440AC, uint16),
-			RCT2_GLOBAL(RCT2_ADDRESS_TRACK_PREVIEW_ROTATION, uint8) & 3,
-			RCT2_GLOBAL(0x00F440AF, uint8),
+			_currentTrackPieceX,
+			_currentTrackPieceY,
+			_currentTrackPieceZ,
+			_currentTrackPieceDirection & 3,
+			_currentTrackPieceType,
 			1,
 			0,
 			NULL
@@ -1177,8 +1222,8 @@ void sub_6C9627()
 	case RIDE_CONSTRUCTION_STATE_8:
 		if (RCT2_GLOBAL(0x00F440B0, uint8) & 1) {
 			map_invalidate_tile_full(
-				RCT2_GLOBAL(0x00F440A8, uint16) & 0xFFE0,
-				RCT2_GLOBAL(0x00F440AA, uint16) & 0xFFE0
+				_currentTrackPieceX & 0xFFE0,
+				_currentTrackPieceY & 0xFFE0
 			);
 			RCT2_GLOBAL(RCT2_ADDRESS_MAP_SELECTION_FLAGS, uint16) &= ~4;
 		}
@@ -1187,7 +1232,7 @@ void sub_6C9627()
 		if (RCT2_GLOBAL(0x00F440B0, uint8) & 1) {
 			RCT2_GLOBAL(0x00F440B0, uint8) &= ~1;
 			RCT2_GLOBAL(RCT2_ADDRESS_MAP_SELECTION_FLAGS, uint8) &= ~4;
-			map_invalidate_tile_full(RCT2_GLOBAL(0x00F440A8, uint16), RCT2_GLOBAL(0x00F440AA, uint16));
+			map_invalidate_tile_full(_currentTrackPieceX, _currentTrackPieceY);
 		}
 		sub_6C96C0();
 		break;
@@ -1196,20 +1241,145 @@ void sub_6C9627()
 
 /**
  * 
+ * rct2: 0x006C9800
+ */
+static void sub_6C9800()
+{
+	RCT2_CALLPROC_EBPSAFE(0x006C9800);
+}
+
+/**
+ * 
  * rct2: 0x006C9296
  */
-static void sub_6C9296()
+void ride_select_next_section()
 {
-	RCT2_CALLPROC_X(0x006C9296, 0, 0, 0, 0, 0, 0, 0);
+	int x, y, z, direction, type;
+	rct_map_element *mapElement;
+	rct_xy_element inputElement, outputElement;
+
+	if (_rideConstructionState == RIDE_CONSTRUCTION_STATE_SELECTED) {
+		sub_6C9627();
+		x = _currentTrackPieceX;
+		y = _currentTrackPieceY;
+		z = _currentTrackPieceZ;
+		direction = _currentTrackPieceDirection;
+		type = _currentTrackPieceType;
+		if (sub_6C683D_head(&x, &y, &z, direction & 3, type, 0, &mapElement, 0)) {
+			_rideConstructionState = RIDE_CONSTRUCTION_STATE_0;
+			sub_6C84CE();
+			return;
+		}
+		inputElement.x = x;
+		inputElement.y = y;
+		inputElement.element = mapElement;
+		if (track_get_next(&inputElement, &outputElement, &z, &direction)) {
+			x = outputElement.x;
+			y = outputElement.y;
+			mapElement = outputElement.element;
+		} else {
+			_rideConstructionState = RIDE_CONSTRUCTION_STATE_FRONT;
+			_currentTrackPieceX = outputElement.x;
+			_currentTrackPieceY = outputElement.y;
+			_currentTrackPieceZ = z;
+			_currentTrackPieceDirection = direction;
+			_currentTrackPieceType = mapElement->properties.track.type;
+			RCT2_GLOBAL(0x00F440B0, uint8) = 0;
+			_rideConstructionArrowPulseTime = 0;
+			sub_6C9800();
+			sub_6C84CE();
+			return;
+		}
+	} else if (_rideConstructionState == RIDE_CONSTRUCTION_STATE_BACK) {
+		sub_6C9627();
+		RCT2_GLOBAL(0x00F441D2, uint8) = _currentRideIndex;
+
+		x = _currentTrackPieceX;
+		y = _currentTrackPieceY;
+		z = _currentTrackPieceZ;
+		direction = _currentTrackPieceDirection ^ 2;
+		mapElement = sub_6C6096(&x, &y, &z, &direction);
+		if (mapElement == NULL)
+			return;
+
+		_rideConstructionState = RIDE_CONSTRUCTION_STATE_SELECTED;
+	}
+
+	_currentTrackPieceX = x;
+	_currentTrackPieceY = y;
+	_currentTrackPieceZ = z;
+	_currentTrackPieceDirection = (mapElement->type & MAP_ELEMENT_DIRECTION_MASK);
+	_currentTrackPieceType = mapElement->properties.track.type;
+	RCT2_GLOBAL(0x00F440B0, uint8) = 0;
+	_rideConstructionArrowPulseTime = 0;
+	sub_6C84CE();
 }
 
 /**
  * 
  * rct2: 0x006C93B8
  */
-static void sub_6C93B8()
+void ride_select_previous_section()
 {
-	RCT2_CALLPROC_X(0x006C93B8, 0, 0, 0, 0, 0, 0, 0);
+	int x, y, z, direction, type;
+	rct_map_element *mapElement;
+	rct_xy_element inputElement, outputElement;
+
+	if (_rideConstructionState == RIDE_CONSTRUCTION_STATE_SELECTED) {
+		sub_6C9627();
+		x = _currentTrackPieceX;
+		y = _currentTrackPieceY;
+		z = _currentTrackPieceZ;
+		direction = _currentTrackPieceDirection;
+		type = _currentTrackPieceType;
+		if (sub_6C683D_head(&x, &y, &z, direction & 3, type, 0, &mapElement, 0)) {
+			_rideConstructionState = RIDE_CONSTRUCTION_STATE_0;
+			sub_6C84CE();
+			return;
+		}
+		inputElement.x = x;
+		inputElement.y = y;
+		inputElement.element = mapElement;
+		if (track_get_previous(&inputElement, &outputElement, &z, &direction)) {
+			x = outputElement.x;
+			y = outputElement.y;
+			mapElement = outputElement.element;
+		} else {
+			_rideConstructionState = RIDE_CONSTRUCTION_STATE_BACK;
+			_currentTrackPieceX = outputElement.x;
+			_currentTrackPieceY = outputElement.y;
+			_currentTrackPieceZ = z;
+			_currentTrackPieceDirection = direction;
+			_currentTrackPieceType = mapElement->properties.track.type;
+			RCT2_GLOBAL(0x00F440B0, uint8) = 0;
+			_rideConstructionArrowPulseTime = 0;
+			sub_6C9800();
+			sub_6C84CE();
+			return;
+		}
+	} else if (_rideConstructionState == RIDE_CONSTRUCTION_STATE_FRONT) {
+		sub_6C9627();
+		RCT2_GLOBAL(0x00F441D2, uint8) = _currentRideIndex;
+
+		x = _currentTrackPieceX;
+		y = _currentTrackPieceY;
+		z = _currentTrackPieceZ;
+		direction = _currentTrackPieceDirection;
+		mapElement = sub_6C63D6(&x, &y, &z, &direction);
+		if (mapElement == NULL)
+			return;
+
+		_rideConstructionState = RIDE_CONSTRUCTION_STATE_SELECTED;
+	}
+
+	_currentTrackPieceX = x;
+	_currentTrackPieceY = y;
+	_currentTrackPieceZ = z;
+	_currentTrackPieceDirection = (mapElement->type & MAP_ELEMENT_DIRECTION_MASK);
+	_currentTrackPieceType = mapElement->properties.track.type;
+	RCT2_GLOBAL(0x00F440B0, uint8) = 0;
+	_rideConstructionArrowPulseTime = 0;
+	sub_6C84CE();
 }
 
 /**
@@ -1242,7 +1412,7 @@ static int ride_modify_entrance_or_exit(rct_map_element *mapElement, int x, int 
 
 	sub_6C9627();
 	if (
-		RCT2_GLOBAL(0x00F440A6, uint8) != RIDE_CONSTRUCTION_STATE_ENTRANCE_EXIT ||
+		_rideConstructionState != RIDE_CONSTRUCTION_STATE_ENTRANCE_EXIT ||
 		!(RCT2_GLOBAL(RCT2_ADDRESS_INPUT_FLAGS, uint8) & INPUT_FLAG_TOOL_ACTIVE) ||
 		RCT2_GLOBAL(RCT2_ADDRESS_TOOL_WINDOWCLASS, rct_windowclass) != WC_RIDE_CONSTRUCTION
 	) {
@@ -1252,10 +1422,9 @@ static int ride_modify_entrance_or_exit(rct_map_element *mapElement, int x, int 
 		RCT2_GLOBAL(0x00F44192, uint8) = rideIndex;
 		RCT2_GLOBAL(0x00F44193, uint8) = bl;
 		RCT2_GLOBAL(RCT2_ADDRESS_INPUT_FLAGS, uint8) |= INPUT_FLAG_6;
-		int al = RCT2_GLOBAL(0x00F440A6, uint8);
-		if (al != RIDE_CONSTRUCTION_STATE_ENTRANCE_EXIT) {
-			RCT2_GLOBAL(0x00F440A6, uint8) = RIDE_CONSTRUCTION_STATE_ENTRANCE_EXIT;
-			RCT2_GLOBAL(0x00F440CC, uint8) = al;
+		if (_rideConstructionState != RIDE_CONSTRUCTION_STATE_ENTRANCE_EXIT) {
+			RCT2_GLOBAL(0x00F440CC, uint8) = _rideConstructionState;
+			_rideConstructionState = RIDE_CONSTRUCTION_STATE_ENTRANCE_EXIT;
 		}
 
 		sub_6C84CE();
@@ -1277,13 +1446,13 @@ static int ride_modify_entrance_or_exit(rct_map_element *mapElement, int x, int 
  */
 int ride_modify_maze(rct_map_element *mapElement, int x, int y)
 {
-	RCT2_GLOBAL(0x00F440A7, uint8) = mapElement->properties.track.ride_index;
-	RCT2_GLOBAL(0x00F440A6, uint8) = RIDE_CONSTRUCTION_STATE_6;
-	RCT2_GLOBAL(0x00F440A8, uint16) = x;
-	RCT2_GLOBAL(0x00F440AA, uint16) = y;
-	RCT2_GLOBAL(0x00F440AC, uint16) = mapElement->base_height * 8;
+	_currentRideIndex = mapElement->properties.track.ride_index;
+	_rideConstructionState = RIDE_CONSTRUCTION_STATE_6;
+	_currentTrackPieceX = x;
+	_currentTrackPieceY = y;
+	_currentTrackPieceZ = mapElement->base_height * 8;
 	RCT2_GLOBAL(0x00F440B0, uint8) = 0;
-	RCT2_GLOBAL(0x00F440B1, uint8) = 0;
+	_rideConstructionArrowPulseTime = 0;
 	RCT2_CALLPROC_X(0x006CD887, 0, 0, 0, 0, 0, 0, 0);
 	return 1;
 }
@@ -1349,47 +1518,47 @@ int ride_modify(rct_xy_element *input)
 	x = mapElement.x;
 	y = mapElement.y;
 
-	RCT2_GLOBAL(0x00F440A7, uint8) = rideIndex;
-	RCT2_GLOBAL(0x00F440A6, uint8) = RIDE_CONSTRUCTION_STATE_SELECTED;
-	RCT2_GLOBAL(0x00F440A8, uint16) = x;
-	RCT2_GLOBAL(0x00F440AA, uint16) = y;
-	RCT2_GLOBAL(0x00F440AC, uint16) = z;
-	RCT2_GLOBAL(RCT2_ADDRESS_TRACK_PREVIEW_ROTATION, uint8) = direction;
-	RCT2_GLOBAL(0x00F440AF, uint8) = type;
+	_currentRideIndex = rideIndex;
+	_rideConstructionState = RIDE_CONSTRUCTION_STATE_SELECTED;
+	_currentTrackPieceX = x;
+	_currentTrackPieceY = y;
+	_currentTrackPieceZ = z;
+	_currentTrackPieceDirection = direction;
+	_currentTrackPieceType = type;
 	RCT2_GLOBAL(0x00F440B0, uint8) = 0;
-	RCT2_GLOBAL(0x00F440B1, uint8) = 0;
+	_rideConstructionArrowPulseTime = 0;
 
 	if (ride_type_has_flag(ride->type, RIDE_TYPE_FLAG_15)) {
 		sub_6C84CE();
 		return 1;
 	}
 
-	sub_6C9296();
-	if (RCT2_GLOBAL(0x00F440A6, uint8) == RIDE_CONSTRUCTION_STATE_FRONT) {
+	ride_select_next_section();
+	if (_rideConstructionState == RIDE_CONSTRUCTION_STATE_FRONT) {
 		sub_6C84CE();
 		return 1;
 	}
 
-	RCT2_GLOBAL(0x00F440A6, uint8) = RIDE_CONSTRUCTION_STATE_SELECTED;
-	RCT2_GLOBAL(0x00F440A8, uint16) = x;
-	RCT2_GLOBAL(0x00F440AA, uint16) = y;
-	RCT2_GLOBAL(0x00F440AC, uint16) = z;
-	RCT2_GLOBAL(RCT2_ADDRESS_TRACK_PREVIEW_ROTATION, uint8) = direction;
-	RCT2_GLOBAL(0x00F440AF, uint8) = type;
+	_rideConstructionState = RIDE_CONSTRUCTION_STATE_SELECTED;
+	_currentTrackPieceX = x;
+	_currentTrackPieceY = y;
+	_currentTrackPieceZ = z;
+	_currentTrackPieceDirection = direction;
+	_currentTrackPieceType = type;
 	RCT2_GLOBAL(0x00F440B0, uint8) = 0;
-	RCT2_GLOBAL(0x00F440B1, uint8) = 0;
+	_rideConstructionArrowPulseTime = 0;
 
-	sub_6C93B8();
+	ride_select_previous_section();
 
-	if (RCT2_GLOBAL(0x00F440A6, uint8) != RIDE_CONSTRUCTION_STATE_BACK) {
-		RCT2_GLOBAL(0x00F440A6, uint8) = RIDE_CONSTRUCTION_STATE_SELECTED;
-		RCT2_GLOBAL(0x00F440A8, uint16) = x;
-		RCT2_GLOBAL(0x00F440AA, uint16) = y;
-		RCT2_GLOBAL(0x00F440AC, uint16) = z;
-		RCT2_GLOBAL(RCT2_ADDRESS_TRACK_PREVIEW_ROTATION, uint8) = direction;
-		RCT2_GLOBAL(0x00F440AF, uint8) = type;
+	if (_rideConstructionState != RIDE_CONSTRUCTION_STATE_BACK) {
+		_rideConstructionState = RIDE_CONSTRUCTION_STATE_SELECTED;
+		_currentTrackPieceX = x;
+		_currentTrackPieceY = y;
+		_currentTrackPieceZ = z;
+		_currentTrackPieceDirection = direction;
+		_currentTrackPieceType = type;
 		RCT2_GLOBAL(0x00F440B0, uint8) = 0;
-		RCT2_GLOBAL(0x00F440B1, uint8) = 0;
+		_rideConstructionArrowPulseTime = 0;
 	}
 
 	sub_6C84CE();
@@ -1419,9 +1588,9 @@ int sub_6CC3FB(int rideIndex)
 	tool_set(w, 23, 12);
 	RCT2_GLOBAL(RCT2_ADDRESS_INPUT_FLAGS, uint32) |= INPUT_FLAG_6;
 
-	ride = GET_RIDE(RCT2_GLOBAL(0x00F440A7, uint8));
+	ride = GET_RIDE(_currentRideIndex);
 
-	RCT2_GLOBAL(0x00F440A0, uint16) = RCT2_ADDRESS(0x0097CC68, uint8)[ride->type * 2] | 0x100;
+	_previousTrackPieceSlope = RCT2_ADDRESS(0x0097CC68, uint8)[ride->type * 2] | 0x100;
 	RCT2_GLOBAL(0x00F440B2, uint8) = 0;
 	RCT2_GLOBAL(0x00F440B3, uint8) = 0;
 	RCT2_GLOBAL(0x00F440B4, uint8) = 0;
@@ -1430,13 +1599,13 @@ int sub_6CC3FB(int rideIndex)
 	if (RCT2_GLOBAL(0x0097D4F2 + (ride->type * 8), uint16) & 0x8000)
 		RCT2_GLOBAL(0x00F440B5, uint8) |= 2;
 
-	RCT2_GLOBAL(0x00F440B6, uint8) = 0;
-	RCT2_GLOBAL(0x00F440B7, uint8) = 0;
+	_previousTrackBankEnd = 0;
+	_previousTrackSlopeEnd = 0;
 
-	RCT2_GLOBAL(RCT2_ADDRESS_TRACK_PREVIEW_ROTATION, uint8) = 0;
-	RCT2_GLOBAL(0x00F440A6, uint8) = RIDE_CONSTRUCTION_STATE_PLACE;
+	_currentTrackPieceDirection = 0;
+	_rideConstructionState = RIDE_CONSTRUCTION_STATE_PLACE;
 	RCT2_GLOBAL(0x00F440B0, uint8) = 0;
-	RCT2_GLOBAL(0x00F440B1, uint8) = 0;
+	_rideConstructionArrowPulseTime = 0;
 	RCT2_GLOBAL(0x00F44159, uint8) = 0;
 	RCT2_GLOBAL(0x00F4415C, uint8) = 0;
 
@@ -3546,12 +3715,12 @@ int ride_check_block_brakes(rct_xy_element *input, rct_xy_element *output)
 	trackElement = *input;
 	rideIndex = trackElement.element->properties.track.ride_index;
 	w = window_find_by_class(WC_RIDE_CONSTRUCTION);
-	if (w != NULL && RCT2_GLOBAL(0x00F440A6, uint8) != RIDE_CONSTRUCTION_STATE_0 && RCT2_GLOBAL(0x00F440A7, uint8) == rideIndex)
+	if (w != NULL && _rideConstructionState != RIDE_CONSTRUCTION_STATE_0 && _currentRideIndex == rideIndex)
 		sub_6C9627();
 
 	loopTrackElement = NULL;
 	while (1) {
-		if (!track_get_next(&trackElement, &nextTrackElement)) {
+		if (!track_get_next(&trackElement, &nextTrackElement, NULL, NULL)) {
 			// Not sure why this is the case...
 			RCT2_GLOBAL(RCT2_ADDRESS_GAME_COMMAND_ERROR_TEXT, uint16) = STR_BLOCK_BRAKES_CANNOT_BE_USED_DIRECTLY_AFTER_STATION;
 			*output = trackElement;
@@ -3709,7 +3878,7 @@ void sub_6B4D26(int rideIndex, rct_xy_element *startElement)
 				currentElement.element->flags &= ~(1 << 5);
 				break;
 			}
-		} while (track_get_next(&currentElement, &currentElement) && currentElement.element != startElement->element);
+		} while (track_get_next(&currentElement, &currentElement, NULL, NULL) && currentElement.element != startElement->element);
 	}
 }
 
